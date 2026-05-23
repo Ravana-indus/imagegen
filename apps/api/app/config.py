@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     supabase_secret_key: str = ""
     storage_bucket: str = "editimage"
     session_secret: str = "replace-in-production-with-a-long-secret"
+    session_cookie_secure: bool = True
     redis_url: str = "redis://localhost:6379/0"
     dashscope_api_key: str = ""
     dashscope_base_url: str = "https://dashscope-intl.aliyuncs.com/api/v1"

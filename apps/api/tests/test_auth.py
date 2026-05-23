@@ -66,3 +66,20 @@ def test_login_rejects_invalid_credentials(monkeypatch) -> None:
 
     assert response.status_code == 401
     app.dependency_overrides.clear()
+
+
+def test_login_can_disable_secure_cookie_for_local_http(monkeypatch) -> None:
+    client = app_client(monkeypatch)
+    monkeypatch.setattr(
+        "app.routes.auth.get_settings",
+        lambda: SimpleNamespace(session_cookie_secure=False),
+    )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "owner@example.com", "password": "correct-password"},
+    )
+
+    assert response.status_code == 200
+    assert "Secure" not in response.headers["set-cookie"]
+    app.dependency_overrides.clear()

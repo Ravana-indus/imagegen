@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import get_db
 from app.models import AdminUser
 from app.schemas import AdminResponse, LoginRequest
@@ -21,7 +22,7 @@ def login(
         "session",
         create_session(str(user.id), user.email),
         httponly=True,
-        secure=True,
+        secure=get_settings().session_cookie_secure,
         samesite="lax",
         max_age=60 * 60 * 12,
     )
@@ -35,4 +36,9 @@ def me(admin: dict[str, str] = Depends(require_admin)) -> AdminResponse:
 
 @router.post("/logout", status_code=204)
 def logout(response: Response) -> None:
-    response.delete_cookie("session", httponly=True, secure=True, samesite="lax")
+    response.delete_cookie(
+        "session",
+        httponly=True,
+        secure=get_settings().session_cookie_secure,
+        samesite="lax",
+    )

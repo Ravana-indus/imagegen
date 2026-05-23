@@ -77,6 +77,8 @@ uv run python -m app.worker
 ```
 
 Run Redis locally or provide a reachable `REDIS_URL`.
+For browser sign-in on local `http://` URLs, set `SESSION_COOKIE_SECURE=false`
+in `apps/api/.env`; keep it `true` in hosted HTTPS environments.
 
 After configuring backend secrets, create the single administrator:
 
