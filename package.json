@@ -1,0 +1,11 @@
+{
+  "name": "product-creative-generator",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "test:web": "pnpm --filter web test",
+    "lint:web": "pnpm --filter web lint",
+    "build:web": "pnpm --filter web build"
+  }
+}
