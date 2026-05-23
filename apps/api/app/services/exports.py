@@ -74,14 +74,18 @@ def create_batch_zip(
             select(ExportAsset).where(
                 ExportAsset.project_id == project_uuid,
                 ExportAsset.asset_type == "final_png",
-            )
+            ).order_by(ExportAsset.created_at.desc())
         )
     )
     if not outputs:
         raise ValueError("No final images are available")
     archive_bytes = BytesIO()
+    latest_outputs: dict[UUID, ExportAsset] = {}
+    for output in outputs:
+        if output.generation_item_id is not None:
+            latest_outputs.setdefault(output.generation_item_id, output)
     with ZipFile(archive_bytes, "w", ZIP_DEFLATED) as archive:
-        for output in outputs:
+        for output in latest_outputs.values():
             archive.writestr(
                 f"{output.generation_item_id}-final.png",
                 storage.download(output.storage_key),

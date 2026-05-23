@@ -130,11 +130,20 @@ def test_layout_export_and_batch_zip_return_signed_downloads(monkeypatch) -> Non
         json={"logo_x": 0.12, "flag_visible": False},
     )
     exported = client.post(f"/api/v1/items/{item_id}/export")
+    incomplete_archive = client.post(f"/api/v1/projects/{project['id']}/exports/zip")
+    second_item_id = project["items"][1]["id"]
+    with Session(engine) as db:
+        item = db.get(GenerationItem, UUID(second_item_id))
+        item.status = "generated"
+        item.base_composite_asset_key = f"generated/{item.id}.png"
+        storage.upload(item.base_composite_asset_key, png(), "image/png")
+        db.commit()
     archive = client.post(f"/api/v1/projects/{project['id']}/exports/zip")
 
     assert updated.status_code == 200
     assert updated.json()["revision"] == 2
     assert exported.json()["download_url"].startswith("https://assets.test/signed/")
+    assert incomplete_archive.status_code == 409
     assert archive.json()["asset_type"] == "batch_zip"
     app.dependency_overrides.clear()
 
