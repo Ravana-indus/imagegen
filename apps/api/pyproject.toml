@@ -5,6 +5,7 @@ requires-python = ">=3.12"
 dependencies = [
   "cairosvg>=2.9.0",
   "fastapi>=0.115,<1",
+  "httpx>=0.28.1",
   "itsdangerous>=2.2.0",
   "pillow>=12.2.0",
   "psycopg[binary]>=3.3.4",
