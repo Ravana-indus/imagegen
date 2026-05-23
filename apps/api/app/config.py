@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     dashscope_api_key: str = ""
     dashscope_base_url: str = "https://dashscope-intl.aliyuncs.com/api/v1"
     dashscope_model: str = "qwen-image-2.0-pro"
+    dashscope_min_interval_seconds: float = 31
     signed_url_ttl_seconds: int = 900
 
 

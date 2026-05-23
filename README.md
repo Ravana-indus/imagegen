@@ -111,3 +111,6 @@ uv run --no-dev python -m app.worker
 
 Both backend services must receive the same API environment variables and
 reach the same Redis service. Only the API origin should be publicly routed.
+For the configured `qwen-image-2.0-pro` model, queued jobs use a Redis-backed
+31-second submission interval; a 25-image batch therefore prioritizes provider
+reliability over immediate completion.
