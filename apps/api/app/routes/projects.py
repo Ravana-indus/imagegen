@@ -124,7 +124,7 @@ async def create_project(
     name: str = Form(min_length=1, max_length=120),
     mode: str = Form(),
     country_code: str = Form(min_length=2, max_length=2),
-    optional_instruction: str | None = Form(default=None, max_length=1000),
+    optional_instruction: str | None = Form(default=None, max_length=450),
     background: UploadFile = File(),
     logo: UploadFile = File(),
     products: list[UploadFile] = File(),

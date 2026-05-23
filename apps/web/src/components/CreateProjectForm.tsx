@@ -103,7 +103,7 @@ export function CreateProjectForm() {
         <textarea
           name="optional_instruction"
           rows={3}
-          maxLength={1000}
+          maxLength={450}
           placeholder="Optional: soft daylight, centered composition"
         />
       </label>

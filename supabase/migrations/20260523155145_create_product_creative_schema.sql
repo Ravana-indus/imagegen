@@ -18,7 +18,7 @@ create table public.projects (
   logo_asset_key text not null,
   country_code char(2) not null,
   flag_asset_key text not null,
-  optional_instruction text check (optional_instruction is null or char_length(optional_instruction) <= 300),
+  optional_instruction text check (optional_instruction is null or char_length(optional_instruction) <= 1000),
   prompt_version text not null default 'product-composite-v1',
   created_by uuid not null references public.admin_users(id),
   created_at timestamptz not null default now(),

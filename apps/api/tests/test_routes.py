@@ -167,3 +167,31 @@ def test_failed_item_can_be_retried(monkeypatch) -> None:
     assert response.json()["status"] == "queued"
     assert jobs[-1] == item_id
     app.dependency_overrides.clear()
+
+
+def test_creative_direction_reserves_space_for_the_protected_qwen_prompt(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, _, _, _, _ = api_client()
+
+    response = client.post(
+        "/api/v1/projects",
+        data={
+            "name": "Long direction",
+            "mode": "single",
+            "country_code": "LK",
+            "optional_instruction": "x" * 451,
+        },
+        files=[
+            ("background", ("background.png", png(), "image/png")),
+            ("logo", ("logo.png", png(), "image/png")),
+            ("products", ("product.png", png(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 422
+    app.dependency_overrides.clear()

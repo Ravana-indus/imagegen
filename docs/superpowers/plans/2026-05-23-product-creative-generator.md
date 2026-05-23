@@ -466,7 +466,7 @@ create table public.projects (
   logo_asset_key text not null,
   country_code char(2) not null,
   flag_asset_key text not null,
-  optional_instruction text check (optional_instruction is null or char_length(optional_instruction) <= 300),
+  optional_instruction text check (optional_instruction is null or char_length(optional_instruction) <= 450),
   prompt_version text not null default 'product-composite-v1',
   created_by uuid not null references public.admin_users(id),
   created_at timestamptz not null default now(),
@@ -2280,7 +2280,7 @@ export function ProjectForm({ onSubmit }: { onSubmit: (form: FormData) => Promis
       <label>Background image<input aria-label="Background image" name="background" type="file" accept="image/png,image/jpeg,image/webp" required /></label>
       <label>Brand logo<input aria-label="Brand logo" name="logo" type="file" accept="image/png,image/webp" required /></label>
       <label>Country flag<select aria-label="Country flag" name="country_code">{countries.map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
-      <label>Creative instruction<textarea name="optional_instruction" maxLength={300} /></label>
+      <label>Creative instruction<textarea name="optional_instruction" maxLength={450} /></label>
       <button type="submit">Generate creatives</button>
     </form>
   );
