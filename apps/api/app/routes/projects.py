@@ -1,44 +1,57 @@
-import re
 from collections.abc import Callable
-from uuid import UUID
+from uuid import UUID, uuid4
 
-import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.jobs import enqueue_generation
+from app.jobs import resolve_generation_handler
 from app.models import GenerationItem, OverlayLayout, Project
-from app.schemas import ItemResponse, LayoutResponse, ProjectResponse, ProjectSummary
+from app.schemas import (
+    ItemResponse,
+    LayoutResponse,
+    ProjectResponse,
+    ProjectSummary,
+    StagedSourceUpload,
+    StagedSourceUploadResponse,
+    SupabaseUploadResponse,
+    AssetOption,
+    ProjectAssetsResponse,
+)
 from app.security import require_admin
-from app.services.assets import MAX_INPUT_BYTES, normalized_png
+from app.services.assets import MAX_INPUT_BYTES, normalize_png
 from app.services.projects import ProjectRequest, SourceUpload, create_project_records
-from app.storage import PrivateStorage
+from app.storage import DevStorage, PrivateStorage, create_storage
 
 router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
-COUNTRY_CODE = re.compile(r"^[A-Za-z]{2}$")
+STAGED_ASSET_TYPES = {"background", "product", "logo", "flag"}
 
 
-def get_storage() -> PrivateStorage:
-    return PrivateStorage()
+def get_storage() -> DevStorage | PrivateStorage:
+    return create_storage()
+
+
+def get_supabase_storage() -> PrivateStorage:
+    try:
+        return PrivateStorage()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Supabase server storage credentials are not configured",
+        ) from exc
+
+
+def get_optional_supabase_storage() -> PrivateStorage | None:
+    try:
+        return PrivateStorage()
+    except RuntimeError:
+        return None
 
 
 def get_enqueue() -> Callable[[str], None]:
-    return enqueue_generation
-
-
-def fetch_country_flag(country_code: str) -> bytes:
-    if not COUNTRY_CODE.fullmatch(country_code):
-        raise ValueError("Country code must contain two letters")
-    response = httpx.get(f"https://flagcdn.com/w640/{country_code.lower()}.png", timeout=15)
-    response.raise_for_status()
-    return normalized_png(response.content, "image/png")
-
-
-def get_flag_fetcher() -> Callable[[str], bytes]:
-    return fetch_country_flag
+    return resolve_generation_handler()
 
 
 def _layout_response(layout: OverlayLayout) -> LayoutResponse:
@@ -46,7 +59,7 @@ def _layout_response(layout: OverlayLayout) -> LayoutResponse:
 
 
 def item_response(
-    db: Session, storage: PrivateStorage, item: GenerationItem
+    db: Session, storage: DevStorage | PrivateStorage, item: GenerationItem
 ) -> ItemResponse:
     layout = db.get(OverlayLayout, item.id)
     if layout is None:
@@ -67,7 +80,7 @@ def item_response(
 
 
 def project_response(
-    db: Session, storage: PrivateStorage, project: Project
+    db: Session, storage: DevStorage | PrivateStorage, project: Project
 ) -> ProjectResponse:
     ttl = get_settings().signed_url_ttl_seconds
     items = list(
@@ -82,7 +95,6 @@ def project_response(
         name=project.name,
         mode=project.mode,
         status=project.status,
-        country_code=project.country_code,
         created_at=project.created_at,
         background_url=storage.signed_url(project.background_asset_key, ttl),
         logo_url=storage.signed_url(project.logo_asset_key, ttl),
@@ -99,6 +111,14 @@ async def _source_file(upload: UploadFile) -> SourceUpload:
     )
 
 
+def _staged_prefix(project_name: str) -> str:
+    normalized = "".join(
+        character.lower() if character.isalnum() else "-"
+        for character in project_name.strip()
+    ).strip("-")
+    return normalized[:48] or "untitled"
+
+
 @router.get("", response_model=list[ProjectSummary])
 def list_projects(
     _: dict[str, str] = Depends(require_admin), db: Session = Depends(get_db)
@@ -106,12 +126,47 @@ def list_projects(
     return list(db.scalars(select(Project).order_by(Project.created_at.desc())))
 
 
+@router.post("/source-uploads", response_model=StagedSourceUploadResponse)
+async def upload_source_files_to_supabase(
+    project_name: str = Form(min_length=1, max_length=120),
+    asset_type: str = Form(),
+    files: list[UploadFile] = File(),
+    _: dict[str, str] = Depends(require_admin),
+    supabase_storage: PrivateStorage = Depends(get_supabase_storage),
+) -> StagedSourceUploadResponse:
+    if asset_type not in STAGED_ASSET_TYPES:
+        raise HTTPException(status_code=422, detail="Unsupported upload asset type")
+    if not files:
+        raise HTTPException(status_code=422, detail="Select at least one image")
+
+    prefix = f"sources/staged/{_staged_prefix(project_name)}-{uuid4()}/{asset_type}"
+    uploads: list[StagedSourceUpload] = []
+    ttl = get_settings().signed_url_ttl_seconds
+    for index, upload in enumerate(files, start=1):
+        source = await _source_file(upload)
+        key = f"{prefix}/{index}-{uuid4()}.png"
+        supabase_storage.upload(
+            key,
+            normalize_png(source.content, source.content_type, source.filename),
+            "image/png",
+        )
+        uploads.append(
+            StagedSourceUpload(
+                asset_type=asset_type,
+                filename=source.filename,
+                storage_key=key,
+                signed_url=supabase_storage.signed_url(key, ttl),
+            )
+        )
+    return StagedSourceUploadResponse(uploads=uploads)
+
+
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
     project_id: UUID,
     _: dict[str, str] = Depends(require_admin),
     db: Session = Depends(get_db),
-    storage: PrivateStorage = Depends(get_storage),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
 ) -> ProjectResponse:
     project = db.get(Project, project_id)
     if project is None:
@@ -119,33 +174,115 @@ def get_project(
     return project_response(db, storage, project)
 
 
+@router.post("/{project_id}/upload-background", response_model=SupabaseUploadResponse)
+def upload_background_to_supabase(
+    project_id: UUID,
+    _: dict[str, str] = Depends(require_admin),
+    db: Session = Depends(get_db),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
+    supabase_storage: PrivateStorage = Depends(get_supabase_storage),
+) -> SupabaseUploadResponse:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    payload = storage.download(project.background_asset_key)
+    key = f"supabase-sync/projects/{project.id}/background.png"
+    supabase_storage.upload(key, payload, "image/png")
+    return SupabaseUploadResponse(
+        asset_type="background",
+        source_key=project.background_asset_key,
+        supabase_key=key,
+    )
+
+
+@router.get("/assets", response_model=ProjectAssetsResponse)
+def get_existing_assets(
+    _: dict[str, str] = Depends(require_admin),
+    db: Session = Depends(get_db),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
+) -> ProjectAssetsResponse:
+    projects = list(db.scalars(select(Project)).all())
+    
+    backgrounds_set = set()
+    logos_set = set()
+    flags_set = set()
+    
+    for p in projects:
+        if p.background_asset_key:
+            backgrounds_set.add(p.background_asset_key)
+        if p.logo_asset_key:
+            logos_set.add(p.logo_asset_key)
+        if p.flag_asset_key:
+            flags_set.add(p.flag_asset_key)
+            
+    ttl = get_settings().signed_url_ttl_seconds
+    
+    backgrounds = [
+        AssetOption(key=key, url=storage.signed_url(key, ttl))
+        for key in sorted(backgrounds_set)
+    ]
+    logos = [
+        AssetOption(key=key, url=storage.signed_url(key, ttl))
+        for key in sorted(logos_set)
+    ]
+    flags = [
+        AssetOption(key=key, url=storage.signed_url(key, ttl))
+        for key in sorted(flags_set)
+    ]
+    
+    return ProjectAssetsResponse(
+        backgrounds=backgrounds,
+        logos=logos,
+        flags=flags
+    )
+
+
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     name: str = Form(min_length=1, max_length=120),
     mode: str = Form(),
-    country_code: str = Form(min_length=2, max_length=2),
     optional_instruction: str | None = Form(default=None, max_length=450),
-    background: UploadFile = File(),
-    logo: UploadFile = File(),
-    products: list[UploadFile] = File(),
+    background: UploadFile | None = File(default=None),
+    logo: UploadFile | None = File(default=None),
+    flag: UploadFile | None = File(default=None),
+    products: list[UploadFile] | None = File(default=None),
+    background_asset_key: str | None = Form(default=None),
+    logo_asset_key: str | None = Form(default=None),
+    flag_asset_key: str | None = Form(default=None),
+    product_asset_keys: list[str] | None = Form(default=None),
     admin: dict[str, str] = Depends(require_admin),
     db: Session = Depends(get_db),
-    storage: PrivateStorage = Depends(get_storage),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
+    supabase_storage: PrivateStorage | None = Depends(get_optional_supabase_storage),
     enqueue: Callable[[str], None] = Depends(get_enqueue),
-    flag_fetcher: Callable[[str], bytes] = Depends(get_flag_fetcher),
 ) -> ProjectResponse:
     try:
+        staged_keys = product_asset_keys or []
+        if background_asset_key or logo_asset_key or flag_asset_key or staged_keys:
+            if supabase_storage is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Supabase server storage credentials are not configured",
+                )
+            active_storage = supabase_storage
+        else:
+            active_storage = storage
         project = create_project_records(
             db,
-            storage,
+            active_storage,
             enqueue,
             UUID(admin["sub"]),
-            ProjectRequest(name, mode, country_code, optional_instruction),
-            await _source_file(background),
-            await _source_file(logo),
-            [await _source_file(product) for product in products],
-            flag_fetcher(country_code),
+            ProjectRequest(name, mode, optional_instruction),
+            await _source_file(background) if background else None,
+            await _source_file(logo) if logo else None,
+            await _source_file(flag) if flag else None,
+            [await _source_file(product) for product in products or []],
+            background_asset_key=background_asset_key,
+            logo_asset_key=logo_asset_key,
+            flag_asset_key=flag_asset_key,
+            product_asset_keys=staged_keys,
         )
-    except (ValueError, httpx.HTTPError) as exc:
+    except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return project_response(db, storage, project)
+    db.refresh(project)
+    return project_response(db, active_storage, project)

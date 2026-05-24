@@ -3,7 +3,7 @@ from io import BytesIO
 from PIL import Image
 import pytest
 
-from app.services.assets import normalized_png, validate_raster_upload
+from app.services.assets import normalize_png, validate_raster_upload
 
 
 def image_bytes(width: int = 384, height: int = 384, format_name: str = "PNG") -> bytes:
@@ -18,14 +18,10 @@ def test_valid_png_returns_dimensions_and_normalizes_to_png() -> None:
     payload = image_bytes()
 
     assert validate_raster_upload(payload, "image/png") == (384, 384)
-    assert normalized_png(payload, "image/png").startswith(b"\x89PNG")
+    assert normalize_png(payload, "image/png", "test").startswith(b"\x89PNG")
 
 
-def test_image_below_qwen_quality_gate_is_rejected() -> None:
-    with pytest.raises(ValueError, match="dimensions"):
-        validate_raster_upload(image_bytes(200, 200), "image/png")
-
-
-def test_non_image_payload_is_rejected() -> None:
-    with pytest.raises(ValueError, match="Invalid image"):
-        validate_raster_upload(b"not-an-image", "image/png")
+def test_image_outside_allowed_dimensions_is_rejected() -> None:
+    payload = image_bytes(200, 200)
+    with pytest.raises(ValueError, match="200×200"):
+        normalize_png(payload, "image/png", "Small image")

@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import GenerationItem, Project
 from app.services.projects import aggregate_project_status
 
@@ -27,6 +28,15 @@ def data_url(payload: bytes) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
+def image_reference(storage: WorkerStorage, key: str) -> str:
+    signed_url = getattr(storage, "signed_url", None)
+    if callable(signed_url):
+        url = signed_url(key, get_settings().signed_url_ttl_seconds)
+        if url.startswith("http://") or url.startswith("https://"):
+            return url
+    return data_url(storage.download(key))
+
+
 def execute_generation(
     item_id: str,
     session_factory: Callable[[], Session],
@@ -46,8 +56,8 @@ def execute_generation(
         db.commit()
         try:
             result = editor.edit(
-                data_url(storage.download(item.source_product_asset_key)),
-                data_url(storage.download(project.background_asset_key)),
+                image_reference(storage, item.source_product_asset_key),
+                image_reference(storage, project.background_asset_key),
                 project.optional_instruction,
             )
             output = fetch_output(result.image_url)

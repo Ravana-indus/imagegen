@@ -31,7 +31,6 @@ class Project(Base):
     status: Mapped[str] = mapped_column(String(24), default="queued")
     background_asset_key: Mapped[str] = mapped_column(Text, nullable=False)
     logo_asset_key: Mapped[str] = mapped_column(Text, nullable=False)
-    country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     flag_asset_key: Mapped[str] = mapped_column(Text, nullable=False)
     optional_instruction: Mapped[str | None] = mapped_column(Text)
     prompt_version: Mapped[str] = mapped_column(

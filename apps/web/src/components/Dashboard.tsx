@@ -37,7 +37,6 @@ export function Dashboard() {
               <span>{project.mode}</span>
             </div>
             <h2>{project.name}</h2>
-            <p>{project.country_code} campaign</p>
             <time>{new Date(project.created_at).toLocaleDateString()}</time>
           </Link>
         ))}

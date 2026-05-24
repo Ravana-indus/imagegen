@@ -33,6 +33,11 @@ class MemoryStorage:
         return self.files[key]
 
 
+class UrlStorage(MemoryStorage):
+    def signed_url(self, key: str, expires_in: int) -> str:
+        return f"https://storage.example/{key}?ttl={expires_in}"
+
+
 def database() -> tuple[object, object]:
     engine = create_engine(
         "sqlite+pysqlite://",
@@ -58,14 +63,14 @@ def create_batch(factory, admin_id, storage: MemoryStorage) -> tuple[Project, li
             storage=storage,
             enqueue=jobs.append,
             admin_id=admin_id,
-            request=ProjectRequest("Campaign", "batch", "LK", "Soft daylight"),
+            request=ProjectRequest("Campaign", "batch", "Soft daylight"),
             background=SourceUpload("background.png", "image/png", png()),
             logo=SourceUpload("logo.png", "image/png", png((255, 0, 0, 255))),
+            flag=SourceUpload("flag.png", "image/png", png((0, 0, 255, 255))),
             products=[
                 SourceUpload("one.png", "image/png", png()),
                 SourceUpload("two.png", "image/png", png()),
             ],
-            flag_bytes=png((0, 0, 255, 255)),
         )
         project_id = project.id
     with factory() as db:
@@ -109,6 +114,69 @@ def test_generation_stores_temporary_qwen_result_as_a_permanent_base_image() -> 
         assert item.status == "generated"
         assert item.base_composite_asset_key.startswith("generated/projects/")
         assert storage.download(item.base_composite_asset_key).startswith(b"\x89PNG")
+
+
+def test_generation_uses_signed_supabase_urls_when_available() -> None:
+    factory, admin_id = database()
+    storage = UrlStorage()
+    project, jobs = create_batch(factory, admin_id, storage)
+    seen: dict[str, str | None] = {}
+    editor = SimpleNamespace(
+        edit=lambda product, background, instruction: seen.update(
+            {"product": product, "background": background, "instruction": instruction}
+        )
+        or SimpleNamespace(
+            request_id="req-1", image_url="https://temporary.example/base.png"
+        )
+    )
+
+    execute_generation(
+        jobs[0],
+        session_factory=factory,
+        storage=storage,
+        editor=editor,
+        fetch_output=lambda url: png((20, 20, 20, 255)),
+    )
+
+    assert seen["product"].startswith("https://storage.example/")
+    assert seen["background"].startswith("https://storage.example/")
+    assert seen["instruction"] == project.optional_instruction
+
+
+def test_project_can_use_staged_supabase_background_and_products() -> None:
+    factory, admin_id = database()
+    storage = MemoryStorage()
+    jobs: list[str] = []
+    with factory() as db:
+        project = create_project_records(
+            db=db,
+            storage=storage,
+            enqueue=jobs.append,
+            admin_id=admin_id,
+            request=ProjectRequest("Campaign", "batch", "Soft daylight"),
+            background=None,
+            logo=SourceUpload("logo.png", "image/png", png((255, 0, 0, 255))),
+            flag=SourceUpload("flag.png", "image/png", png((0, 0, 255, 255))),
+            products=[],
+            background_asset_key="sources/staged/campaign/background/1.png",
+            product_asset_keys=[
+                "sources/staged/campaign/product/1.png",
+                "sources/staged/campaign/product/2.png",
+            ],
+        )
+        project_id = project.id
+
+    with factory() as db:
+        project = db.get(Project, project_id)
+        items = list(db.scalars(select(GenerationItem)))
+
+    assert project.background_asset_key == "sources/staged/campaign/background/1.png"
+    assert [item.source_product_asset_key for item in items] == [
+        "sources/staged/campaign/product/1.png",
+        "sources/staged/campaign/product/2.png",
+    ]
+    assert len(jobs) == 2
+    assert not any(key.endswith("background.png") for key in storage.files)
 
 
 def test_export_renders_final_png_and_batch_zip_from_saved_results() -> None:

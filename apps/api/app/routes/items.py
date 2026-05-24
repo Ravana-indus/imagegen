@@ -7,12 +7,24 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models import GenerationItem, OverlayLayout, Project
-from app.routes.projects import get_enqueue, get_storage, item_response
-from app.schemas import ExportResponse, ItemResponse, LayoutResponse, LayoutUpdate, RetryResponse
+from app.routes.projects import (
+    get_enqueue,
+    get_storage,
+    get_supabase_storage,
+    item_response,
+)
+from app.schemas import (
+    ExportResponse,
+    ItemResponse,
+    LayoutResponse,
+    LayoutUpdate,
+    RetryResponse,
+    SupabaseUploadResponse,
+)
 from app.security import require_admin
 from app.services.exports import export_final_image
 from app.services.projects import retryable_status
-from app.storage import PrivateStorage
+from app.storage import DevStorage, PrivateStorage
 
 router = APIRouter(prefix="/api/v1/items", tags=["items"])
 
@@ -22,7 +34,7 @@ def get_item(
     item_id: UUID,
     _: dict[str, str] = Depends(require_admin),
     db: Session = Depends(get_db),
-    storage: PrivateStorage = Depends(get_storage),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
 ) -> ItemResponse:
     item = db.get(GenerationItem, item_id)
     if item is None:
@@ -82,7 +94,7 @@ def export_item(
     item_id: UUID,
     _: dict[str, str] = Depends(require_admin),
     db: Session = Depends(get_db),
-    storage: PrivateStorage = Depends(get_storage),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
 ) -> ExportResponse:
     try:
         asset = export_final_image(db, storage, item_id)
@@ -94,4 +106,25 @@ def export_item(
         download_url=storage.signed_url(
             asset.storage_key, get_settings().signed_url_ttl_seconds
         ),
+    )
+
+
+@router.post("/{item_id}/upload-product", response_model=SupabaseUploadResponse)
+def upload_product_to_supabase(
+    item_id: UUID,
+    _: dict[str, str] = Depends(require_admin),
+    db: Session = Depends(get_db),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
+    supabase_storage: PrivateStorage = Depends(get_supabase_storage),
+) -> SupabaseUploadResponse:
+    item = db.get(GenerationItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Generation item not found")
+    payload = storage.download(item.source_product_asset_key)
+    key = f"supabase-sync/projects/{item.project_id}/products/{item.id}.png"
+    supabase_storage.upload(key, payload, "image/png")
+    return SupabaseUploadResponse(
+        asset_type="product",
+        source_key=item.source_product_asset_key,
+        supabase_key=key,
     )

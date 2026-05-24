@@ -25,12 +25,29 @@ def render_final_png(
         if not layer.visible:
             continue
         overlay = Image.open(BytesIO(content)).convert("RGBA")
-        size = (
-            max(1, round(canvas.width * layer.width)),
-            max(1, round(canvas.height * layer.height)),
+        box_width = max(1, round(canvas.width * layer.width))
+        box_height = max(1, round(canvas.height * layer.height))
+        
+        orig_width, orig_height = overlay.size
+        overlay_aspect = orig_width / orig_height
+        box_aspect = box_width / box_height
+        
+        if overlay_aspect > box_aspect:
+            new_width = box_width
+            new_height = max(1, round(new_width / overlay_aspect))
+        else:
+            new_height = box_height
+            new_width = max(1, round(new_height * overlay_aspect))
+            
+        overlay = overlay.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        offset_x = (box_width - new_width) / 2
+        offset_y = (box_height - new_height) / 2
+        
+        position = (
+            round(canvas.width * layer.x + offset_x),
+            round(canvas.height * layer.y + offset_y),
         )
-        overlay = overlay.resize(size, Image.Resampling.LANCZOS)
-        position = (round(canvas.width * layer.x), round(canvas.height * layer.y))
         canvas.alpha_composite(overlay, position)
     output = BytesIO()
     canvas.save(output, "PNG")

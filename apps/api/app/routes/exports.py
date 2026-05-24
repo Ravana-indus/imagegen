@@ -11,7 +11,7 @@ from app.routes.projects import get_storage
 from app.schemas import ExportResponse
 from app.security import require_admin
 from app.services.exports import create_batch_zip, export_final_image
-from app.storage import PrivateStorage
+from app.storage import DevStorage, PrivateStorage
 
 router = APIRouter(prefix="/api/v1/projects", tags=["exports"])
 
@@ -21,7 +21,7 @@ def export_project_zip(
     project_id: UUID,
     _: dict[str, str] = Depends(require_admin),
     db: Session = Depends(get_db),
-    storage: PrivateStorage = Depends(get_storage),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
 ) -> ExportResponse:
     items = list(
         db.scalars(

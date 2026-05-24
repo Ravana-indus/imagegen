@@ -3,7 +3,13 @@
 /* eslint-disable @next/next/no-img-element */
 import { ChangeEvent, CSSProperties, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, ExportAsset, GenerationItem, Layout, Project } from "@/lib/api";
+import {
+  apiRequest,
+  ExportAsset,
+  GenerationItem,
+  Layout,
+  Project,
+} from "@/lib/api";
 
 function layerStyle(x: number, y: number, width: number, height: number): CSSProperties {
   return {

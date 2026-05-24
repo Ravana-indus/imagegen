@@ -2,6 +2,7 @@ from io import BytesIO
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import create_engine
@@ -10,8 +11,13 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
-from app.models import AdminUser, GenerationItem
-from app.routes.projects import get_enqueue, get_flag_fetcher, get_storage
+from app.models import AdminUser, GenerationItem, Project
+from app.routes.projects import (
+    get_enqueue,
+    get_optional_supabase_storage,
+    get_storage,
+    get_supabase_storage,
+)
 from app.security import require_admin
 
 
@@ -65,9 +71,6 @@ def api_client() -> tuple[TestClient, object, MemoryStorage, list[str], UUID]:
     }
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_enqueue] = lambda: jobs.append
-    app.dependency_overrides[get_flag_fetcher] = lambda: lambda country_code: png(
-        (0, 120, 40, 255)
-    )
     return TestClient(app), engine, storage, jobs, admin_id
 
 
@@ -77,12 +80,12 @@ def create_batch(client: TestClient):
         data={
             "name": "Summer range",
             "mode": "batch",
-            "country_code": "LK",
             "optional_instruction": "Soft studio light",
         },
         files=[
             ("background", ("background.png", png(), "image/png")),
             ("logo", ("logo.png", png((255, 255, 255, 255)), "image/png")),
+            ("flag", ("flag.png", png((0, 120, 40, 255)), "image/png")),
             ("products", ("one.png", png((20, 30, 40, 255)), "image/png")),
             ("products", ("two.png", png((50, 60, 70, 255)), "image/png")),
         ],
@@ -102,11 +105,44 @@ def test_create_batch_uploads_sources_lists_items_and_enqueues_work(
 
     assert response.status_code == 201
     project = response.json()
-    assert project["country_code"] == "LK"
+    assert project["mode"] == "batch"
     assert len(project["items"]) == 2
     assert len(jobs) == 2
     assert any(key.endswith("/flag.png") for key in storage.files)
     assert client.get("/api/v1/projects").json()[0]["name"] == "Summer range"
+    app.dependency_overrides.clear()
+
+
+def test_create_response_refreshes_project_after_inline_generation(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, engine, _, _, _ = api_client()
+
+    def mark_generated(item_id: str) -> None:
+        with Session(engine) as db:
+            item = db.get(GenerationItem, UUID(item_id))
+            item.status = "generated"
+            project = db.get(Project, item.project_id)
+            project.status = "completed"
+            db.commit()
+
+    app.dependency_overrides[get_enqueue] = lambda: mark_generated
+
+    response = client.post(
+        "/api/v1/projects",
+        data={"name": "Inline", "mode": "single"},
+        files=[
+            ("background", ("background.png", png(), "image/png")),
+            ("logo", ("logo.png", png(), "image/png")),
+            ("flag", ("flag.png", png(), "image/png")),
+            ("products", ("product.png", png(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "completed"
     app.dependency_overrides.clear()
 
 
@@ -183,15 +219,130 @@ def test_creative_direction_reserves_space_for_the_protected_qwen_prompt(
         data={
             "name": "Long direction",
             "mode": "single",
-            "country_code": "LK",
             "optional_instruction": "x" * 451,
         },
         files=[
             ("background", ("background.png", png(), "image/png")),
             ("logo", ("logo.png", png(), "image/png")),
+            ("flag", ("flag.png", png(), "image/png")),
             ("products", ("product.png", png(), "image/png")),
         ],
     )
 
     assert response.status_code == 422
+    app.dependency_overrides.clear()
+
+
+def test_background_and_product_can_be_uploaded_to_supabase(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, _, storage, _, _ = api_client()
+    project = create_batch(client).json()
+    item_id = project["items"][0]["id"]
+
+    uploads: dict[str, bytes] = {}
+
+    class SupabaseSink:
+        def upload(self, key: str, payload: bytes, content_type: str) -> str:
+            uploads[key] = payload
+            return key
+
+    app.dependency_overrides[get_supabase_storage] = lambda: SupabaseSink()
+
+    background = client.post(f"/api/v1/projects/{project['id']}/upload-background")
+    product = client.post(f"/api/v1/items/{item_id}/upload-product")
+
+    assert background.status_code == 200
+    assert product.status_code == 200
+    background_key = background.json()["supabase_key"]
+    product_key = product.json()["supabase_key"]
+    assert background_key in uploads
+    assert product_key in uploads
+    assert background.json()["source_key"] in storage.files
+    assert product.json()["source_key"] in storage.files
+    app.dependency_overrides.clear()
+
+
+def test_upload_to_supabase_requires_credentials(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, _, _, _, _ = api_client()
+    project = create_batch(client).json()
+    item_id = project["items"][0]["id"]
+    app.dependency_overrides[get_supabase_storage] = lambda: (_ for _ in ()).throw(
+        HTTPException(
+            status_code=409,
+            detail="Supabase server storage credentials are not configured",
+        )
+    )
+
+    background = client.post(f"/api/v1/projects/{project['id']}/upload-background")
+    product = client.post(f"/api/v1/items/{item_id}/upload-product")
+
+    assert background.status_code == 409
+    assert product.status_code == 409
+    app.dependency_overrides.clear()
+
+
+def test_source_upload_stages_new_project_images_in_supabase(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, _, _, _, _ = api_client()
+    supabase_storage = MemoryStorage()
+    app.dependency_overrides[get_supabase_storage] = lambda: supabase_storage
+
+    response = client.post(
+        "/api/v1/projects/source-uploads",
+        data={"project_name": "Launch", "asset_type": "background"},
+        files=[("files", ("background.png", png(), "image/png"))],
+    )
+
+    assert response.status_code == 200
+    upload = response.json()["uploads"][0]
+    assert upload["asset_type"] == "background"
+    assert upload["storage_key"] in supabase_storage.files
+    assert upload["signed_url"].startswith("https://assets.test/signed/")
+    app.dependency_overrides.clear()
+
+
+def test_create_project_uses_staged_supabase_sources(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, engine, supabase_storage, jobs, _ = api_client()
+    app.dependency_overrides[get_optional_supabase_storage] = lambda: supabase_storage
+
+    response = client.post(
+        "/api/v1/projects",
+        files=[
+            ("name", (None, "Staged")),
+            ("mode", (None, "single")),
+            (
+                "background_asset_key",
+                (None, "sources/staged/staged/background/1.png"),
+            ),
+            (
+                "product_asset_keys",
+                (None, "sources/staged/staged/product/1.png"),
+            ),
+            ("logo", ("logo.png", png(), "image/png")),
+            ("flag", ("flag.png", png(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 201
+    project = response.json()
+    assert project["background_url"].startswith("https://assets.test/signed/")
+    assert len(project["items"]) == 1
+    assert len(jobs) == 1
+    with Session(engine) as db:
+        item = db.get(GenerationItem, UUID(project["items"][0]["id"]))
+    assert item.source_product_asset_key == "sources/staged/staged/product/1.png"
     app.dependency_overrides.clear()

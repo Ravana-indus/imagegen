@@ -19,7 +19,11 @@ def test_signed_session_round_trips_admin_identity(monkeypatch) -> None:
     }
 
 
-def test_missing_session_is_unauthorized() -> None:
+def test_missing_session_is_unauthorized(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.security.get_settings",
+        lambda: SimpleNamespace(session_secret="long-development-secret", auth_mode="session"),
+    )
     with pytest.raises(HTTPException) as error:
         require_admin(None)
 

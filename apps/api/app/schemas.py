@@ -60,7 +60,6 @@ class ProjectSummary(BaseModel):
     name: str
     mode: str
     status: str
-    country_code: str
     created_at: datetime
 
 
@@ -80,3 +79,31 @@ class ExportResponse(BaseModel):
 class RetryResponse(BaseModel):
     id: UUID
     status: str
+
+
+class SupabaseUploadResponse(BaseModel):
+    asset_type: str
+    source_key: str
+    supabase_key: str
+
+
+class StagedSourceUpload(BaseModel):
+    asset_type: str
+    filename: str
+    storage_key: str
+    signed_url: str
+
+
+class StagedSourceUploadResponse(BaseModel):
+    uploads: list[StagedSourceUpload]
+
+
+class AssetOption(BaseModel):
+    key: str
+    url: str
+
+
+class ProjectAssetsResponse(BaseModel):
+    backgrounds: list[AssetOption]
+    logos: list[AssetOption]
+    flags: list[AssetOption]
