@@ -114,3 +114,4 @@ reach the same Redis service. Only the API origin should be publicly routed.
 For the configured `qwen-image-2.0-pro` model, queued jobs use a Redis-backed
 31-second submission interval; a 25-image batch therefore prioritizes provider
 reliability over immediate completion.
+# imagegen
