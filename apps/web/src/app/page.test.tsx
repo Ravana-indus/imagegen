@@ -3,15 +3,15 @@ import { describe, expect, it } from "vitest";
 import HomePage from "./page";
 
 describe("HomePage", () => {
-  it("directs the admin to start creating branded images", () => {
+  it("opens the internal app without a sign-in step", () => {
     render(<HomePage />);
 
     expect(
       screen.getByRole("heading", { name: "Product Creative Generator" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open dashboard" })).toHaveAttribute(
       "href",
-      "/login",
+      "/dashboard",
     );
   });
 });

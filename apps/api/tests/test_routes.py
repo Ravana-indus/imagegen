@@ -346,3 +346,112 @@ def test_create_project_uses_staged_supabase_sources(monkeypatch) -> None:
         item = db.get(GenerationItem, UUID(project["items"][0]["id"]))
     assert item.source_product_asset_key == "sources/staged/staged/product/1.png"
     app.dependency_overrides.clear()
+
+
+def test_existing_assets_route_returns_reusable_project_images(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, _, _, _, _ = api_client()
+    create_batch(client)
+
+    response = client.get("/api/v1/projects/assets")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["backgrounds"]) == 1
+    assert len(body["logos"]) == 1
+    assert len(body["flags"]) == 1
+    assert body["backgrounds"][0]["url"].startswith("https://assets.test/signed/")
+    app.dependency_overrides.clear()
+
+
+def test_generated_images_route_lists_names_details_and_preview_urls(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, engine, storage, _, _ = api_client()
+    project = create_batch(client).json()
+    first_item_id = project["items"][0]["id"]
+    with Session(engine) as db:
+        item = db.get(GenerationItem, UUID(first_item_id))
+        item.status = "generated"
+        item.base_composite_asset_key = f"generated/{item.id}.png"
+        storage.upload(item.base_composite_asset_key, png(), "image/png")
+        db.commit()
+
+    response = client.get("/api/v1/projects/generated-images")
+
+    assert response.status_code == 200
+    images = response.json()
+    assert len(images) == 1
+    assert images[0]["name"] == "Summer range - Product 1"
+    assert images[0]["project_name"] == "Summer range"
+    assert images[0]["item_index"] == 1
+    assert images[0]["status"] == "generated"
+    assert images[0]["preview_url"].startswith("https://assets.test/signed/")
+    app.dependency_overrides.clear()
+
+
+def test_generated_images_route_survives_missing_storage_objects(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, engine, storage, _, _ = api_client()
+    project = create_batch(client).json()
+    first_item_id = project["items"][0]["id"]
+    with Session(engine) as db:
+        item = db.get(GenerationItem, UUID(first_item_id))
+        item.status = "generated"
+        item.base_composite_asset_key = f"generated/{item.id}.png"
+        db.commit()
+
+    def missing_signed_url(key: str, expires_in: int) -> str:
+        raise RuntimeError("Object not found")
+
+    storage.signed_url = missing_signed_url
+
+    response = client.get("/api/v1/projects/generated-images")
+
+    assert response.status_code == 200
+    images = response.json()
+    assert images[0]["name"] == "Summer range - Product 1"
+    assert images[0]["preview_url"] is None
+    app.dependency_overrides.clear()
+
+
+def test_project_response_omits_missing_generated_previews(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.projects.get_settings",
+        lambda: SimpleNamespace(signed_url_ttl_seconds=900),
+    )
+    client, engine, storage, _, _ = api_client()
+    project = create_batch(client).json()
+    first_item_id = project["items"][0]["id"]
+    with Session(engine) as db:
+        item = db.get(GenerationItem, UUID(first_item_id))
+        item.status = "generated"
+        item.base_composite_asset_key = f"generated/{item.id}.png"
+        db.commit()
+
+    def signed_url(key: str, expires_in: int) -> str:
+        if key.startswith("generated/"):
+            raise RuntimeError("Object not found")
+        return f"https://assets.test/signed/{key}?ttl={expires_in}"
+
+    storage.signed_url = signed_url
+
+    response = client.get(f"/api/v1/projects/{project['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["preview_url"] is None
+    app.dependency_overrides.clear()
+
+
+def test_missing_dev_storage_asset_returns_not_found() -> None:
+    response = TestClient(app).get("/storage/does-not-exist.png")
+
+    assert response.status_code == 404

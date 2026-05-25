@@ -38,6 +38,8 @@ The supplied project `qukjfjpevpjzctrtfuse` has been migrated:
   and `export_assets`.
 - Row Level Security is enabled on all application tables with browser roles
   revoked; the backend performs privileged access.
+- Admin passwords live in Supabase Auth. `admin_users` is now the app profile
+  table used for project ownership, not the credential store.
 - Storage bucket `editimage` is private and accepts supported image types and
   ZIP exports.
 - Creative instructions are limited to 450 characters so the protected Qwen
@@ -80,7 +82,9 @@ Run Redis locally or provide a reachable `REDIS_URL`.
 For browser sign-in on local `http://` URLs, set `SESSION_COOKIE_SECURE=false`
 in `apps/api/.env`; keep it `true` in hosted HTTPS environments.
 
-After configuring backend secrets, create the single administrator:
+After configuring backend secrets, create or update a Supabase Auth
+administrator. The script confirms the email, sets the password, and marks the
+Auth user with `app_metadata.role = admin`:
 
 ```bash
 cd apps/api

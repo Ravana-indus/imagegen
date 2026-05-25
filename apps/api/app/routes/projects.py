@@ -10,15 +10,16 @@ from app.db import get_db
 from app.jobs import resolve_generation_handler
 from app.models import GenerationItem, OverlayLayout, Project
 from app.schemas import (
+    AssetOption,
+    GeneratedImageResponse,
     ItemResponse,
     LayoutResponse,
+    ProjectAssetsResponse,
     ProjectResponse,
     ProjectSummary,
     StagedSourceUpload,
     StagedSourceUploadResponse,
     SupabaseUploadResponse,
-    AssetOption,
-    ProjectAssetsResponse,
 )
 from app.security import require_admin
 from app.services.assets import MAX_INPUT_BYTES, normalize_png
@@ -54,6 +55,17 @@ def get_enqueue() -> Callable[[str], None]:
     return resolve_generation_handler()
 
 
+def _safe_signed_url(
+    storage: DevStorage | PrivateStorage, key: str, ttl: int
+) -> str | None:
+    if isinstance(storage, DevStorage) and not (storage.root / key).is_file():
+        return None
+    try:
+        return storage.signed_url(key, ttl)
+    except Exception:
+        return None
+
+
 def _layout_response(layout: OverlayLayout) -> LayoutResponse:
     return LayoutResponse.model_validate(layout)
 
@@ -66,8 +78,10 @@ def item_response(
         raise HTTPException(status_code=500, detail="Item layout is missing")
     preview_url = None
     if item.base_composite_asset_key:
-        preview_url = storage.signed_url(
-            item.base_composite_asset_key, get_settings().signed_url_ttl_seconds
+        preview_url = _safe_signed_url(
+            storage,
+            item.base_composite_asset_key,
+            get_settings().signed_url_ttl_seconds,
         )
     return ItemResponse(
         id=item.id,
@@ -124,6 +138,90 @@ def list_projects(
     _: dict[str, str] = Depends(require_admin), db: Session = Depends(get_db)
 ) -> list[Project]:
     return list(db.scalars(select(Project).order_by(Project.created_at.desc())))
+
+
+@router.get("/assets", response_model=ProjectAssetsResponse)
+def get_existing_assets(
+    _: dict[str, str] = Depends(require_admin),
+    db: Session = Depends(get_db),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
+) -> ProjectAssetsResponse:
+    projects = list(db.scalars(select(Project)).all())
+
+    backgrounds_set = set()
+    logos_set = set()
+    flags_set = set()
+
+    for project in projects:
+        if project.background_asset_key:
+            backgrounds_set.add(project.background_asset_key)
+        if project.logo_asset_key:
+            logos_set.add(project.logo_asset_key)
+        if project.flag_asset_key:
+            flags_set.add(project.flag_asset_key)
+
+    ttl = get_settings().signed_url_ttl_seconds
+
+    backgrounds = [
+        AssetOption(key=key, url=url)
+        for key in sorted(backgrounds_set)
+        if (url := _safe_signed_url(storage, key, ttl)) is not None
+    ]
+    logos = [
+        AssetOption(key=key, url=url)
+        for key in sorted(logos_set)
+        if (url := _safe_signed_url(storage, key, ttl)) is not None
+    ]
+    flags = [
+        AssetOption(key=key, url=url)
+        for key in sorted(flags_set)
+        if (url := _safe_signed_url(storage, key, ttl)) is not None
+    ]
+
+    return ProjectAssetsResponse(
+        backgrounds=backgrounds,
+        logos=logos,
+        flags=flags,
+    )
+
+
+@router.get("/generated-images", response_model=list[GeneratedImageResponse])
+def list_generated_images(
+    _: dict[str, str] = Depends(require_admin),
+    db: Session = Depends(get_db),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
+) -> list[GeneratedImageResponse]:
+    ttl = get_settings().signed_url_ttl_seconds
+    responses: list[GeneratedImageResponse] = []
+    projects = list(db.scalars(select(Project).order_by(Project.created_at.desc())))
+    for project in projects:
+        items = list(
+            db.scalars(
+                select(GenerationItem)
+                .where(GenerationItem.project_id == project.id)
+                .order_by(GenerationItem.created_at)
+            )
+        )
+        for index, item in enumerate(items, start=1):
+            if item.base_composite_asset_key is None:
+                continue
+            responses.append(
+                GeneratedImageResponse(
+                    id=item.id,
+                    project_id=project.id,
+                    project_name=project.name,
+                    name=f"{project.name} - Product {index}",
+                    status=item.status,
+                    item_index=index,
+                    attempt_count=item.attempt_count,
+                    created_at=item.created_at,
+                    preview_url=_safe_signed_url(
+                        storage, item.base_composite_asset_key, ttl
+                    ),
+                    source_product_asset_key=item.source_product_asset_key,
+                )
+            )
+    return responses
 
 
 @router.post("/source-uploads", response_model=StagedSourceUploadResponse)
@@ -192,48 +290,6 @@ def upload_background_to_supabase(
         asset_type="background",
         source_key=project.background_asset_key,
         supabase_key=key,
-    )
-
-
-@router.get("/assets", response_model=ProjectAssetsResponse)
-def get_existing_assets(
-    _: dict[str, str] = Depends(require_admin),
-    db: Session = Depends(get_db),
-    storage: DevStorage | PrivateStorage = Depends(get_storage),
-) -> ProjectAssetsResponse:
-    projects = list(db.scalars(select(Project)).all())
-    
-    backgrounds_set = set()
-    logos_set = set()
-    flags_set = set()
-    
-    for p in projects:
-        if p.background_asset_key:
-            backgrounds_set.add(p.background_asset_key)
-        if p.logo_asset_key:
-            logos_set.add(p.logo_asset_key)
-        if p.flag_asset_key:
-            flags_set.add(p.flag_asset_key)
-            
-    ttl = get_settings().signed_url_ttl_seconds
-    
-    backgrounds = [
-        AssetOption(key=key, url=storage.signed_url(key, ttl))
-        for key in sorted(backgrounds_set)
-    ]
-    logos = [
-        AssetOption(key=key, url=storage.signed_url(key, ttl))
-        for key in sorted(logos_set)
-    ]
-    flags = [
-        AssetOption(key=key, url=storage.signed_url(key, ttl))
-        for key in sorted(flags_set)
-    ]
-    
-    return ProjectAssetsResponse(
-        backgrounds=backgrounds,
-        logos=logos,
-        flags=flags
     )
 
 

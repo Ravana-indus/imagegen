@@ -70,6 +70,19 @@ class ProjectResponse(ProjectSummary):
     items: list[ItemResponse]
 
 
+class GeneratedImageResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    project_name: str
+    name: str
+    status: str
+    item_index: int
+    attempt_count: int
+    created_at: datetime
+    preview_url: str | None
+    source_product_asset_key: str
+
+
 class ExportResponse(BaseModel):
     id: UUID
     asset_type: str

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./product_creative.db"
     initialize_database: bool = True
-    auth_mode: str = "auto"
+    auth_mode: str = "dev"
     dev_admin_id: UUID = UUID("00000000-0000-4000-8000-000000000001")
     dev_admin_email: str = "local-dev@example.test"
     storage_backend: str = "auto"

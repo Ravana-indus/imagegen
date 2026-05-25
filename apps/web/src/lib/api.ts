@@ -36,6 +36,19 @@ export type Project = ProjectSummary & {
   items: GenerationItem[];
 };
 
+export type GeneratedImage = {
+  id: string;
+  project_id: string;
+  project_name: string;
+  name: string;
+  status: string;
+  item_index: number;
+  attempt_count: number;
+  created_at: string;
+  preview_url: string | null;
+  source_product_asset_key: string;
+};
+
 export type ExportAsset = {
   id: string;
   asset_type: string;

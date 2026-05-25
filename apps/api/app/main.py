@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -52,4 +52,7 @@ DEV_STORAGE_ROOT = Path(__file__).resolve().parents[2] / "dev-storage"
 
 @app.get("/storage/{key:path}")
 def serve_dev_asset(key: str) -> FileResponse:
-    return FileResponse(DEV_STORAGE_ROOT / key)
+    path = DEV_STORAGE_ROOT / key
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return FileResponse(path)

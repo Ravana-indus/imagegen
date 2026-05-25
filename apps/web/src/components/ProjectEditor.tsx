@@ -108,6 +108,9 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     },
   });
   const project = projectQuery.data;
+  const allItemsReady = Boolean(
+    project?.items.length && project.items.every((item) => item.preview_url),
+  );
   const activeItem = useMemo(
     () => project?.items.find((item) => item.id === activeId) ?? project?.items[0],
     [activeId, project],
@@ -155,13 +158,16 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     await queryClient.invalidateQueries({ queryKey: ["project", projectId] });
   }
 
-  async function exportZip() {
+  async function prepareAllDownloads(startDownload = false) {
     const output = await apiRequest<ExportAsset>(
       `/projects/${projectId}/exports/zip`,
       { method: "POST" },
     );
     setDownload(output);
-    setMessage("Batch ZIP is ready.");
+    setMessage("All downloads are ready.");
+    if (startDownload) {
+      window.location.href = output.download_url;
+    }
   }
 
   if (projectQuery.isPending) return <p className="notice">Loading project...</p>;
@@ -175,16 +181,14 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
           <p className="eyebrow">{project.mode} project</p>
           <h1>{project.name}</h1>
         </div>
-        {project.mode === "batch" && (
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={project.status !== "completed"}
-            onClick={exportZip}
-          >
-            Download all ZIP
-          </button>
-        )}
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={!allItemsReady}
+          onClick={() => prepareAllDownloads(true)}
+        >
+          Download all ZIP
+        </button>
       </div>
       <div className="editor-layout">
         <aside className="item-list" aria-label="Products">
@@ -294,6 +298,14 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
               Prepare download
             </button>
           )}
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={!allItemsReady}
+            onClick={() => prepareAllDownloads()}
+          >
+            Prepare all downloads
+          </button>
           {message && <p className="notice small">{message}</p>}
         </aside>
       </div>
