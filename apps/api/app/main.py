@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.db import initialize_database
 from app.routes.auth import router as auth_router
@@ -30,9 +30,15 @@ app.include_router(exports_router)
 
 @app.exception_handler(Exception)
 async def catch_unhandled(_request: Request, exc: Exception) -> JSONResponse:
-    if isinstance(exc, SQLAlchemyError):
-        logger.exception("Database error during request")
+    if isinstance(exc, OperationalError):
+        logger.exception("Database connection error during request")
         detail = "Database connection failed"
+    elif isinstance(exc, IntegrityError):
+        logger.exception("Database integrity error during request")
+        detail = f"Data integrity error: {exc.orig}"
+    elif isinstance(exc, SQLAlchemyError):
+        logger.exception("Database error during request")
+        detail = f"Database error: {exc.orig}"
     elif isinstance(exc, (ModuleNotFoundError, ImportError)):
         logger.exception("Missing dependency")
         detail = "Server is missing a required package — check the API logs"

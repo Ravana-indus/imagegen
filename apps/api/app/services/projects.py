@@ -98,6 +98,7 @@ def create_project_records(
         created_by=admin_id,
     )
     db.add(project)
+    db.flush()  # Ensure project row exists before FK-dependent child inserts
     item_ids: list[str] = []
     if staged_product_keys:
         product_keys = staged_product_keys

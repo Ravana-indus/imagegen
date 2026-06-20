@@ -1,0 +1,25 @@
+{
+  "backgrounds": [
+    { "key": "sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/background.png", "url": "/storage/sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/background.png" },
+    { "key": "sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/background.png", "url": "/storage/sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/background.png" },
+    { "key": "sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/background.png", "url": "/storage/sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/background.png" },
+    { "key": "sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/background.png", "url": "/storage/sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/background.png" },
+    { "key": "sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/background.png", "url": "/storage/sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/background.png" }
+  ],
+  "logos": [
+    { "key": "sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/logo.png", "url": "/storage/sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/logo.png" },
+    { "key": "sources/projects/10948196-0ce1-4a19-80c2-c479c7c50041/logo.png", "url": "/storage/sources/projects/10948196-0ce1-4a19-80c2-c479c7c50041/logo.png" },
+    { "key": "sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/logo.png", "url": "/storage/sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/logo.png" },
+    { "key": "sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/logo.png", "url": "/storage/sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/logo.png" },
+    { "key": "sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/logo.png", "url": "/storage/sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/logo.png" },
+    { "key": "sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/logo.png", "url": "/storage/sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/logo.png" }
+  ],
+  "flags": [
+    { "key": "sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/flag.png", "url": "/storage/sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/flag.png" },
+    { "key": "sources/projects/10948196-0ce1-4a19-80c2-c479c7c50041/flag.png", "url": "/storage/sources/projects/10948196-0ce1-4a19-80c2-c479c7c50041/flag.png" },
+    { "key": "sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/flag.png", "url": "/storage/sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/flag.png" },
+    { "key": "sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/flag.png", "url": "/storage/sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/flag.png" },
+    { "key": "sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/flag.png", "url": "/storage/sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/flag.png" },
+    { "key": "sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/flag.png", "url": "/storage/sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/flag.png" }
+  ]
+}

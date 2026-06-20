@@ -1,0 +1,86 @@
+[
+  {
+    "id": "c1c93c0a-c86f-4930-9f98-0cb7a19eec37",
+    "project_id": "10948196-0ce1-4a19-80c2-c479c7c50041",
+    "project_name": "Batch Process",
+    "name": "Batch Process - Product 1",
+    "status": "generated",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-06-20T14:57:28.121036",
+    "preview_url": "/storage/generated/projects/10948196-0ce1-4a19-80c2-c479c7c50041/items/c1c93c0a-c86f-4930-9f98-0cb7a19eec37/base.png",
+    "source_product_asset_key": "sources/projects/10948196-0ce1-4a19-80c2-c479c7c50041/products/6a86d2ac-d6e8-4648-b67f-fed8a7680978.png"
+  },
+  {
+    "id": "6dc4c05c-8fa4-4c08-a252-52cc62efb96e",
+    "project_id": "aabfa556-8fe4-46cb-9588-b3246fbf548c",
+    "project_name": "Newsais Org",
+    "name": "Newsais Org - Product 1",
+    "status": "generated",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-06-20T14:53:02.675910",
+    "preview_url": "/storage/generated/projects/aabfa556-8fe4-46cb-9588-b3246fbf548c/items/6dc4c05c-8fa4-4c08-a252-52cc62efb96e/base.png",
+    "source_product_asset_key": "sources/staged/newsais-org-63713756-a04e-4c03-b481-c9db80a96ada/product/1-2b69bbca-c632-44f3-ac86-87b9b1658417.png"
+  },
+  {
+    "id": "05f41bc2-2d70-4332-bc70-25affb60b2a7",
+    "project_id": "55b98bd4-0e32-4f1c-8d8a-ed33472e44ff",
+    "project_name": "Pathurjan w",
+    "name": "Pathurjan w - Product 1",
+    "status": "generated",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-05-24T09:03:16.057324",
+    "preview_url": "/storage/generated/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/items/05f41bc2-2d70-4332-bc70-25affb60b2a7/base.png",
+    "source_product_asset_key": "sources/projects/55b98bd4-0e32-4f1c-8d8a-ed33472e44ff/products/05f41bc2-2d70-4332-bc70-25affb60b2a7.png"
+  },
+  {
+    "id": "e038cd9c-c845-4708-bd30-4fe2ab466881",
+    "project_id": "8618a0b2-6982-4a7a-b6bd-a314738bb498",
+    "project_name": "Pathurjan w",
+    "name": "Pathurjan w - Product 1",
+    "status": "generated",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-05-24T08:58:45.016542",
+    "preview_url": "/storage/generated/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/items/e038cd9c-c845-4708-bd30-4fe2ab466881/base.png",
+    "source_product_asset_key": "sources/projects/8618a0b2-6982-4a7a-b6bd-a314738bb498/products/e038cd9c-c845-4708-bd30-4fe2ab466881.png"
+  },
+  {
+    "id": "1d16355d-62fd-4ef5-901c-1fb8d3fb4d27",
+    "project_id": "1a09cba6-9f82-40e3-b94c-c2f67c73c2e7",
+    "project_name": "Fresh Qwen debug",
+    "name": "Fresh Qwen debug - Product 1",
+    "status": "generated",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-05-24T08:55:18.514564",
+    "preview_url": "/storage/generated/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/items/1d16355d-62fd-4ef5-901c-1fb8d3fb4d27/base.png",
+    "source_product_asset_key": "sources/projects/1a09cba6-9f82-40e3-b94c-c2f67c73c2e7/products/1d16355d-62fd-4ef5-901c-1fb8d3fb4d27.png"
+  },
+  {
+    "id": "311bf776-51f9-48a4-a77e-ec719c19fb52",
+    "project_id": "af903f6a-31cd-4999-9118-0575ffd8e50d",
+    "project_name": "Test",
+    "name": "Test - Product 1",
+    "status": "generated",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-05-24T08:52:54.725055",
+    "preview_url": "/storage/generated/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/items/311bf776-51f9-48a4-a77e-ec719c19fb52/base.png",
+    "source_product_asset_key": "sources/projects/af903f6a-31cd-4999-9118-0575ffd8e50d/products/311bf776-51f9-48a4-a77e-ec719c19fb52.png"
+  },
+  {
+    "id": "4e8dd904-2c2f-4030-b789-296d5aafe743",
+    "project_id": "02d7bbdc-ed00-4841-8eda-2c712fda62f7",
+    "project_name": "Local Qwen smoke test",
+    "name": "Local Qwen smoke test - Product 1",
+    "status": "exported",
+    "item_index": 1,
+    "attempt_count": 1,
+    "created_at": "2026-05-24T08:48:35.200456",
+    "preview_url": "/storage/generated/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/items/4e8dd904-2c2f-4030-b789-296d5aafe743/base.png",
+    "source_product_asset_key": "sources/projects/02d7bbdc-ed00-4841-8eda-2c712fda62f7/products/4e8dd904-2c2f-4030-b789-296d5aafe743.png"
+  }
+]
