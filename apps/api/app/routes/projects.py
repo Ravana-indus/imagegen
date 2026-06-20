@@ -44,13 +44,6 @@ def get_supabase_storage() -> PrivateStorage:
         ) from exc
 
 
-def get_optional_supabase_storage() -> PrivateStorage | None:
-    try:
-        return PrivateStorage()
-    except RuntimeError:
-        return None
-
-
 def get_enqueue() -> Callable[[str], None]:
     return resolve_generation_handler()
 
@@ -225,12 +218,12 @@ def list_generated_images(
 
 
 @router.post("/source-uploads", response_model=StagedSourceUploadResponse)
-async def upload_source_files_to_supabase(
+async def upload_source_files(
     project_name: str = Form(min_length=1, max_length=120),
     asset_type: str = Form(),
     files: list[UploadFile] = File(),
     _: dict[str, str] = Depends(require_admin),
-    supabase_storage: PrivateStorage = Depends(get_supabase_storage),
+    storage: DevStorage | PrivateStorage = Depends(get_storage),
 ) -> StagedSourceUploadResponse:
     if asset_type not in STAGED_ASSET_TYPES:
         raise HTTPException(status_code=422, detail="Unsupported upload asset type")
@@ -243,7 +236,7 @@ async def upload_source_files_to_supabase(
     for index, upload in enumerate(files, start=1):
         source = await _source_file(upload)
         key = f"{prefix}/{index}-{uuid4()}.png"
-        supabase_storage.upload(
+        storage.upload(
             key,
             normalize_png(source.content, source.content_type, source.filename),
             "image/png",
@@ -253,7 +246,7 @@ async def upload_source_files_to_supabase(
                 asset_type=asset_type,
                 filename=source.filename,
                 storage_key=key,
-                signed_url=supabase_storage.signed_url(key, ttl),
+                signed_url=storage.signed_url(key, ttl),
             )
         )
     return StagedSourceUploadResponse(uploads=uploads)
@@ -309,20 +302,11 @@ async def create_project(
     admin: dict[str, str] = Depends(require_admin),
     db: Session = Depends(get_db),
     storage: DevStorage | PrivateStorage = Depends(get_storage),
-    supabase_storage: PrivateStorage | None = Depends(get_optional_supabase_storage),
     enqueue: Callable[[str], None] = Depends(get_enqueue),
 ) -> ProjectResponse:
     try:
         staged_keys = product_asset_keys or []
-        if background_asset_key or logo_asset_key or flag_asset_key or staged_keys:
-            if supabase_storage is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Supabase server storage credentials are not configured",
-                )
-            active_storage = supabase_storage
-        else:
-            active_storage = storage
+        active_storage = storage
         project = create_project_records(
             db,
             active_storage,

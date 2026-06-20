@@ -62,7 +62,7 @@ export function CreateProjectForm() {
       const fields = new FormData(form);
       const projectName = fields.get("name")?.toString().trim();
       if (!projectName) {
-        throw new Error("Name the project before uploading to Supabase.");
+        throw new Error("Name the project before staging images.");
       }
       const sourceFiles =
         assetType === "background"
@@ -228,10 +228,10 @@ export function CreateProjectForm() {
                 onClick={() => uploadSource("background")}
               >
                 {sourceUploading === "background"
-                  ? "Uploading background..."
+                  ? "Staging background..."
                   : backgroundUpload
-                    ? "Background uploaded"
-                    : "Upload background to Supabase"}
+                    ? "Background staged"
+                    : "Stage background"}
               </button>
             </div>
           ) : (
@@ -386,10 +386,10 @@ export function CreateProjectForm() {
             onClick={() => uploadSource("product")}
           >
             {sourceUploading === "product"
-              ? "Uploading products..."
+              ? "Staging products..."
               : productUploads.length > 0
-                ? `${productUploads.length} product${productUploads.length === 1 ? "" : "s"} uploaded`
-                : "Upload product to Supabase"}
+                ? `${productUploads.length} product${productUploads.length === 1 ? "" : "s"} staged`
+                : "Stage product"}
           </button>
         </label>
       </div>

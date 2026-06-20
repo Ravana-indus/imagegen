@@ -24,11 +24,11 @@ describe("CreateProjectForm", () => {
     );
 
     expect(screen.getByLabelText("Background image")).toBeRequired();
-    expect(screen.getByRole("button", { name: "Upload background to Supabase" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stage background" })).toBeInTheDocument();
     expect(screen.getByLabelText("Brand logo")).toBeRequired();
     expect(screen.getByLabelText("Flag image")).toBeRequired();
     fireEvent.click(screen.getByRole("radio", { name: "Batch" }));
     expect(screen.getByLabelText(/Product image/)).toHaveAttribute("multiple");
-    expect(screen.getByRole("button", { name: "Upload product to Supabase" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stage product" })).toBeInTheDocument();
   });
 });

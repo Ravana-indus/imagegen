@@ -14,7 +14,6 @@ from app.main import app
 from app.models import AdminUser, GenerationItem, Project
 from app.routes.projects import (
     get_enqueue,
-    get_optional_supabase_storage,
     get_storage,
     get_supabase_storage,
 )
@@ -288,14 +287,12 @@ def test_upload_to_supabase_requires_credentials(monkeypatch) -> None:
     app.dependency_overrides.clear()
 
 
-def test_source_upload_stages_new_project_images_in_supabase(monkeypatch) -> None:
+def test_source_upload_stages_new_project_images_in_configured_storage(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.routes.projects.get_settings",
         lambda: SimpleNamespace(signed_url_ttl_seconds=900),
     )
-    client, _, _, _, _ = api_client()
-    supabase_storage = MemoryStorage()
-    app.dependency_overrides[get_supabase_storage] = lambda: supabase_storage
+    client, _, storage, _, _ = api_client()
 
     response = client.post(
         "/api/v1/projects/source-uploads",
@@ -306,18 +303,17 @@ def test_source_upload_stages_new_project_images_in_supabase(monkeypatch) -> Non
     assert response.status_code == 200
     upload = response.json()["uploads"][0]
     assert upload["asset_type"] == "background"
-    assert upload["storage_key"] in supabase_storage.files
+    assert upload["storage_key"] in storage.files
     assert upload["signed_url"].startswith("https://assets.test/signed/")
     app.dependency_overrides.clear()
 
 
-def test_create_project_uses_staged_supabase_sources(monkeypatch) -> None:
+def test_create_project_uses_staged_sources_from_configured_storage(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.routes.projects.get_settings",
         lambda: SimpleNamespace(signed_url_ttl_seconds=900),
     )
-    client, engine, supabase_storage, jobs, _ = api_client()
-    app.dependency_overrides[get_optional_supabase_storage] = lambda: supabase_storage
+    client, engine, storage, jobs, _ = api_client()
 
     response = client.post(
         "/api/v1/projects",
@@ -345,6 +341,7 @@ def test_create_project_uses_staged_supabase_sources(monkeypatch) -> None:
     with Session(engine) as db:
         item = db.get(GenerationItem, UUID(project["items"][0]["id"]))
     assert item.source_product_asset_key == "sources/staged/staged/product/1.png"
+    assert project["background_url"].startswith("https://assets.test/signed/")
     app.dependency_overrides.clear()
 
 
